@@ -2,6 +2,8 @@ import streamlit as st
 import asyncio
 from gmaps_scraper import GoogleMapsScraper, ScrapeConfig
 
+import os
+os.system('playwright install firefox')
 # Page configuration
 st.set_page_config(page_title="City Business Data Extractor", layout="wide")
 st.title("📍 City Business Data Extractor")
