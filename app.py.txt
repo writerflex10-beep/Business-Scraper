@@ -1,0 +1,62 @@
+import streamlit as st
+import asyncio
+from gmaps_scraper import GoogleMapsScraper, ScrapeConfig
+
+# Page configuration
+st.set_page_config(page_title="City Business Data Extractor", layout="wide")
+st.title("📍 City Business Data Extractor")
+st.markdown("Enter a city and business type (e.g., `coffee shop in Austin TX`), and the system will scrape Google Maps data.")
+
+# Input box
+query = st.text_input("Search Query", "coffee shop in Austin TX")
+
+if st.button("Start Scraping"):
+    if not query:
+        st.warning("Please enter a search query.")
+    else:
+        with st.spinner("Scraping in progress, please wait... (the first run may take a bit longer to install browser dependencies)"):
+            try:
+                # Define scraping configuration
+                config = ScrapeConfig(language="en", headless=True)
+                
+                # Since Streamlit runs synchronously, we need to wrap the async call
+                async def run_scrape():
+                    async with GoogleMapsScraper(config) as scraper:
+                        # Construct Google Maps search URL
+                        search_url = f"https://www.google.com/maps/search/{query.replace(' ', '+')}"
+                        result = await scraper.scrape(search_url)
+                        return result
+
+                # Execute async task
+                result = asyncio.run(run_scrape())
+
+                if result.success and result.place:
+                    place = result.place
+                    # Display results
+                    st.success("Scraping successful!")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Store Name", place.name or "N/A")
+                        st.metric("Phone", place.phone or "N/A")
+                        st.metric("Review Count", place.review_count or "N/A")
+                    with col2:
+                        st.metric("Rating", place.rating or "N/A")
+                        st.metric("Address", place.address or "N/A")
+                        st.metric("Category", place.category or "N/A")
+                    
+                    # Note: This open-source library may not return "editorial_summary" directly
+                    # The "descriptions" field might contain relevant information, or you can display other available fields
+                    if hasattr(place, 'description') and place.description:
+                        st.subheader("Summary/Description")
+                        st.write(place.description)
+                    else:
+                        st.info("Note: This scraper may not obtain Google's official 'editorial summary' field. The 'Category' above is usually the closest alternative.")
+                        
+                    st.subheader("Raw Data (Partial)")
+                    st.json(result.place.__dict__ if hasattr(result.place, '__dict__') else str(result.place))
+                else:
+                    st.error(f"Scraping failed or no results found. Error: {getattr(result, 'error', 'Unknown error')}")
+                    
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
